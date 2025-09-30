@@ -1,0 +1,40 @@
+# values.yaml
+
+# Operator image
+image:
+  repository: ghcr.io/authzed/spicedb-operator
+  tag: v1.18.0
+  pullPolicy: IfNotPresent
+
+installCRDs: true
+
+serviceAccount:
+  create: true
+  name: spicedb-operator-sa
+
+podSecurityContext:
+  runAsUser: 65532
+  runAsGroup: 65532
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsUser: 65532
+  runAsGroup: 65532
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+nodeSelector: {}
+tolerations: []
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "200m"
+    memory: "256Mi"
