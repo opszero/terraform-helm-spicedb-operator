@@ -2,16 +2,34 @@
 
 ## Providers
 
-No providers.
+| Name | Version |
+|------|---------|
+| <a name="provider_helm"></a> [helm](#provider\_helm) | n/a |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | n/a |
 ## Inputs
 
-No inputs.
+| Name | Description | Type | Default | Required |
+|------|-------------|------|---------|:--------:|
+| <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to deploy into | `string` | `"spicedb-system"` | no |
+| <a name="input_release_name"></a> [release\_name](#input\_release\_name) | Helm release name | `string` | `"spicedb-operator"` | no |
+| <a name="input_spicedb-operator"></a> [spicedb-operator](#input\_spicedb-operator) | Enable OpenTelemetry Collector deployment | `bool` | `false` | no |
+| <a name="input_spicedb_cluster_enabled"></a> [spicedb\_cluster\_enabled](#input\_spicedb\_cluster\_enabled) | Whether to deploy SpiceDBCluster CRs | `bool` | `true` | no |
+| <a name="input_spicedb_clusters"></a> [spicedb\_clusters](#input\_spicedb\_clusters) | n/a | <pre>list(object({<br/>    name          = string<br/>    config        = any<br/>    secretName    = string<br/>    preshared_key = string<br/>    datastore_uri = string<br/>  }))</pre> | `[]` | no |
+| <a name="input_values_file"></a> [values\_file](#input\_values\_file) | Path to the values.yaml file | `string` | `""` | no |
 ## Resources
 
-No resources.
+| Name | Type |
+|------|------|
+| [helm_release.spicedb-operator](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
+| [kubernetes_manifest.spicedb_cluster](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_secret.spicedb_config](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret) | resource |
 ## Outputs
 
-No outputs.
+| Name | Description |
+|------|-------------|
+| <a name="output_spicedb_clusters"></a> [spicedb\_clusters](#output\_spicedb\_clusters) | List of SpiceDB Clusters deployed |
+| <a name="output_spicedb_operator_release"></a> [spicedb\_operator\_release](#output\_spicedb\_operator\_release) | Name and Namespace of the deployed SpiceDB Operator |
+| <a name="output_spicedb_secrets"></a> [spicedb\_secrets](#output\_spicedb\_secrets) | Secrets created for each SpiceDB cluster |
 # 🚀 Built by opsZero!
 
 <a href="https://opszero.com"><img src="https://opszero.com/wp-content/uploads/2024/07/opsZero_logo_svg.svg" width="300px"/></a>
