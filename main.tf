@@ -36,27 +36,30 @@ module "postgresql" {
 
 }
 
-
 resource "kubernetes_namespace" "spicedb" {
+  depends_on = [module.postgresql]
   metadata {
     name = "spicedb"
   }
 }
 
-
-data "http" "spicedb_operator_bundle" {
+data "http" "spicedb_bundle" {
   url = "https://github.com/authzed/spicedb-operator/releases/latest/download/bundle.yaml"
 }
-
-# Apply it with server-side apply
-resource "kubectl_manifest" "spicedb_operator" {
-  yaml_body         = data.http.spicedb_operator_bundle.response_body
-  server_side_apply = true
+locals {
+  documents = [for doc in split("---", data.http.spicedb_bundle.response_body) : doc if trimspace(doc) != ""]
 }
 
+resource "kubectl_manifest" "spicedb_operator" {
+  for_each = { for idx, doc in local.documents : idx => doc }
+
+  yaml_body         = each.value
+  server_side_apply = true
+  depends_on = [kubernetes_namespace.spicedb]
+}
 
 resource "kubectl_manifest" "dispatch_cert" {
-  depends_on = [kubernetes_namespace.spicedb]
+  depends_on = [kubernetes_namespace.spicedb, kubectl_manifest.spicedb_operator]
 
   yaml_body = <<-YAML
     apiVersion: cert-manager.io/v1
@@ -100,7 +103,7 @@ resource "kubectl_manifest" "dispatch_cert" {
 
 
 resource "kubectl_manifest" "spicedb_config" {
-  depends_on = [kubernetes_namespace.spicedb]
+  depends_on = [kubernetes_namespace.spicedb, kubectl_manifest.spicedb_operator]
 
   yaml_body = <<YAML
 apiVersion: authzed.com/v1alpha1
