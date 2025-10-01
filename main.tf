@@ -1,10 +1,3 @@
-# Password auto generate
-resource "random_password" "password" {
-  count   = var.password == "" ? 1 : 0
-  length  = 16
-  special = true
-}
-
 module "postgresql" {
   source                          = "git::https://github.com/opszero/terraform-aws-rds.git?ref=v1.0.1"
   name                            = var.name
@@ -21,7 +14,7 @@ module "postgresql" {
   enabled_cloudwatch_logs_exports = var.enabled_cloudwatch_logs_exports
   db_name                         = var.db_name
   db_username                     = var.username
-  password                        = var.password == "" ? join("", random_password.password.*.result) : var.password
+  password                        = var.password
   port                            = "5432"
   instance_class                  = var.instance_class
   engine                          = var.engine
@@ -55,10 +48,11 @@ resource "kubectl_manifest" "spicedb_operator" {
 
   yaml_body         = each.value
   server_side_apply = true
-  depends_on = [kubernetes_namespace.spicedb]
+  depends_on        = [kubernetes_namespace.spicedb]
 }
 
-resource "kubectl_manifest" "dispatch_cert" {
+
+resource "kubectl_manifest" "dispatch_selfsigned_issuer" {
   depends_on = [kubernetes_namespace.spicedb, kubectl_manifest.spicedb_operator]
 
   yaml_body = <<-YAML
@@ -68,7 +62,19 @@ resource "kubectl_manifest" "dispatch_cert" {
       name: dispatch-selfsigned-issuer
     spec:
       selfSigned: {}
-    ---
+  YAML
+
+  server_side_apply = true
+}
+
+resource "kubectl_manifest" "dispatch_ca_cert" {
+  depends_on = [
+    kubernetes_namespace.spicedb,
+    kubectl_manifest.spicedb_operator,
+    kubectl_manifest.dispatch_selfsigned_issuer
+  ]
+
+  yaml_body = <<-YAML
     apiVersion: cert-manager.io/v1
     kind: Certificate
     metadata:
@@ -78,7 +84,7 @@ resource "kubectl_manifest" "dispatch_cert" {
       isCA: true
       commonName: ${var.name}.spicedb
       dnsNames:
-      - ${var.name}.spicedb
+        - ${var.name}.spicedb
       secretName: dispatch-root-secret
       privateKey:
         algorithm: ECDSA
@@ -87,7 +93,19 @@ resource "kubectl_manifest" "dispatch_cert" {
         name: dispatch-selfsigned-issuer
         kind: ClusterIssuer
         group: cert-manager.io
-    ---
+  YAML
+
+  server_side_apply = true
+}
+
+resource "kubectl_manifest" "dispatch_ca_issuer" {
+  depends_on = [
+    kubernetes_namespace.spicedb,
+    kubectl_manifest.spicedb_operator,
+    kubectl_manifest.dispatch_ca_cert
+  ]
+
+  yaml_body = <<-YAML
     apiVersion: cert-manager.io/v1
     kind: Issuer
     metadata:
@@ -96,58 +114,72 @@ resource "kubectl_manifest" "dispatch_cert" {
     spec:
       ca:
         secretName: dispatch-root-secret
-      YAML
+  YAML
 
   server_side_apply = true
 }
 
+resource "kubectl_manifest" "spicedb_cluster" {
+  depends_on = [
+    kubernetes_namespace.spicedb,
+    kubectl_manifest.spicedb_operator,
+    kubectl_manifest.dispatch_ca_cert
+  ]
 
-resource "kubectl_manifest" "spicedb_config" {
-  depends_on = [kubernetes_namespace.spicedb, kubectl_manifest.spicedb_operator]
+  yaml_body = <<-YAML
+    apiVersion: authzed.com/v1alpha1
+    kind: SpiceDBCluster
+    metadata:
+      name: spicedb
+      namespace: spicedb
+    spec:
+      config:
+        datastoreEngine: postgres
+        replicas: 2
+        dispatchUpstreamCASecretName: dispatch-root-secret
+        dispatchClusterTLSCertPath: "/etc/dispatch/tls.crt"
+        dispatchClusterTLSKeyPath: "/etc/dispatch/tls.key"
+      secretName: spicedb-config
+      patches:
+        - kind: Deployment
+          patch:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: spicedb
+                      volumeMounts:
+                        - name: custom-dispatch-tls
+                          readOnly: true
+                          mountPath: "/etc/dispatch"
+                  volumes:
+                    - name: custom-dispatch-tls
+                      secret:
+                        secretName: dispatch-root-secret
+  YAML
 
-  yaml_body = <<YAML
-apiVersion: authzed.com/v1alpha1
-kind: SpiceDBCluster
-metadata:
-  name: spicedb
-  namespace: spicedb
-spec:
-  config:
-    datastoreEngine: postgres
-    replicas: 2
-    dispatchUpstreamCASecretName: dispatch-root-secret
-    dispatchClusterTLSCertPath: "/etc/dispatch/tls.crt"
-    dispatchClusterTLSKeyPath: "/etc/dispatch/tls.key"
-  secretName: spicedb-config
-  patches:
-  - kind: Deployment
-    patch:
-      spec:
-        template:
-          spec:
-            containers:
-            - name: spicedb
-              volumeMounts:
-              - name: custom-dispatch-tls
-                readOnly: true
-                mountPath: "/etc/dispatch"
-            volumes:
-            - name: custom-dispatch-tls
-              secret:
-                secretName: dispatch-root-secret
----
-apiVersion: v1
-kind: Secret
-type: Opaque
-metadata:
-  name: spicedb-config
-  namespace: spicedb
-stringData:
-  preshared_key: ${var.preshared_key}
-  # If your password can contain special characters, urlencode it.
-  # Example uses urlencode(); remove it if you don't need it.
-  datastore_uri: "postgresql://${var.username}:${urlencode(var.password == "" ? join("", random_password.password.*.result) : var.password)}@postgres.com:5432/spicedb"
-YAML
+  server_side_apply = true
+}
+
+resource "kubectl_manifest" "spicedb_config_secret" {
+  depends_on = [
+    kubernetes_namespace.spicedb,
+    kubectl_manifest.spicedb_operator
+  ]
+
+  yaml_body = <<-YAML
+    apiVersion: v1
+    kind: Secret
+    type: Opaque
+    metadata:
+      name: spicedb-config
+      namespace: spicedb
+    stringData:
+      preshared_key: ${var.preshared_key}
+      # If your password can contain special characters, urlencode it.
+      # Example uses urlencode(); remove it if you don't need it.
+      datastore_uri: "postgresql://${var.username}:${var.password}@${module.postgresql.db_instance_address}:5432/spicedb"
+  YAML
 
   server_side_apply = true
 }
