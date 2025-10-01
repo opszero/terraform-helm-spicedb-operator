@@ -103,45 +103,48 @@ resource "kubectl_manifest" "spicedb_config" {
   depends_on = [kubernetes_namespace.spicedb]
 
   yaml_body = <<YAML
-    apiVersion: authzed.com/v1alpha1
-    kind: SpiceDBCluster
-    metadata:
-      name: spicedb
-      namespace: spicedb
-    spec:
-      config:
-        datastoreEngine: postgres
-        replicas: 2
-        dispatchUpstreamCASecretName: dispatch-root-secret
-        dispatchClusterTLSCertPath: "/etc/dispatch/tls.crt"
-        dispatchClusterTLSKeyPath: "/etc/dispatch/tls.key"
-      secretName: spicedb-config
-      patches:
-      - kind: Deployment
-        patch:
+apiVersion: authzed.com/v1alpha1
+kind: SpiceDBCluster
+metadata:
+  name: spicedb
+  namespace: spicedb
+spec:
+  config:
+    datastoreEngine: postgres
+    replicas: 2
+    dispatchUpstreamCASecretName: dispatch-root-secret
+    dispatchClusterTLSCertPath: "/etc/dispatch/tls.crt"
+    dispatchClusterTLSKeyPath: "/etc/dispatch/tls.key"
+  secretName: spicedb-config
+  patches:
+  - kind: Deployment
+    patch:
+      spec:
+        template:
           spec:
-            template:
-              spec:
-                containers:
-                - name: spicedb
-                  volumeMounts:
-                  - name: custom-dispatch-tls
-                    readOnly: true
-                    mountPath: "/etc/dispatch"
-                volumes:
-                - name: custom-dispatch-tls
-                  secret:
-                    secretName: dispatch-root-secret
-    ---
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      name: spicedb-config
-      namespace: spicedb
-    stringData:
-      preshared_key: ${var.preshared_key}
-      datastore_uri: "postgresql://${var.username}:${var.password == "" ? join("", random_password.password.*.result) : var.password}@postgres.com:5432"
-    YAML
+            containers:
+            - name: spicedb
+              volumeMounts:
+              - name: custom-dispatch-tls
+                readOnly: true
+                mountPath: "/etc/dispatch"
+            volumes:
+            - name: custom-dispatch-tls
+              secret:
+                secretName: dispatch-root-secret
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: spicedb-config
+  namespace: spicedb
+stringData:
+  preshared_key: ${var.preshared_key}
+  # If your password can contain special characters, urlencode it.
+  # Example uses urlencode(); remove it if you don't need it.
+  datastore_uri: "postgresql://${var.username}:${urlencode(var.password == "" ? join("", random_password.password.*.result) : var.password)}@postgres.com:5432/spicedb"
+YAML
 
   server_side_apply = true
 }
