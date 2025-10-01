@@ -1,5 +1,5 @@
 module "postgresql" {
-  source                          = "git::https://github.com/opszero/terraform-aws-rds.git?ref=v1.0.1"
+  source                          = "git::https://github.com/opszero/terraform-aws-rds.git?ref=v1.0.2"
   name                            = var.name
   allowed_ip                      = var.allowed_ip
   allowed_ports                   = var.allowed_ports
@@ -26,6 +26,7 @@ module "postgresql" {
   apply_immediately               = var.apply_immediately
   deletion_protection             = var.deletion_protection
   ssm_parameter_endpoint_enabled  = var.ssm_parameter_endpoint_enabled
+  manage_master_user_password     = var.manage_master_user_password
 
 }
 
@@ -135,7 +136,7 @@ resource "kubectl_manifest" "spicedb_cluster" {
     spec:
       config:
         datastoreEngine: postgres
-        replicas: 2
+        replicas: ${var.replicas}
         dispatchUpstreamCASecretName: dispatch-root-secret
         dispatchClusterTLSCertPath: "/etc/dispatch/tls.crt"
         dispatchClusterTLSKeyPath: "/etc/dispatch/tls.key"

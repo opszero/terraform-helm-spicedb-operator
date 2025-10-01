@@ -171,3 +171,14 @@ variable "preshared_key" {
   description = "Preshared key for SpiceDB authentication. If empty, a random key will be generated. This value is sensitive and should be kept secret."
   sensitive   = true
 }
+
+variable "replicas" {
+  type    = number
+  default = 2
+}
+
+variable "manage_master_user_password" {
+  description = "Whether to allow RDS to manage the master user password in Secrets Manager"
+  type        = bool
+  default     = null
+}
