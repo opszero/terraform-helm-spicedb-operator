@@ -83,9 +83,9 @@ resource "kubectl_manifest" "dispatch_ca_cert" {
       namespace: spicedb
     spec:
       isCA: true
-      commonName: ${var.name}.spicedb
+      commonName: spicedb.spicedb.svc.cluster.local
       dnsNames:
-        - ${var.name}.spicedb
+        - spicedb.spicedb.svc.cluster.local
       secretName: dispatch-root-secret
       privateKey:
         algorithm: ECDSA
