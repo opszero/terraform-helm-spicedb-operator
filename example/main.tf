@@ -21,6 +21,5 @@ module "spicedb-operator" {
   password            = "NR2KojxO7wY19jiQnA0bv"
   allowed_ip          = ["0.0.0.0/0"]
   preshared_key       = "cnkcASMcisdkfiwujcf9IR"
-  deletion_protection = false
 
 }
